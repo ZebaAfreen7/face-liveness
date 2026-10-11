@@ -6,6 +6,7 @@ import {
 } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs';
 import { BlinkDetector } from './blink.js';
 import { headTurnRatio, turnDirection } from './headturn.js';
+import { HeadTurnChallenge } from './challenge.js';
 
 const blinkDetector = new BlinkDetector();
 const blinkCountText = document.getElementById('blink-count');
@@ -13,6 +14,15 @@ const earText = document.getElementById('ear-value');
 const eyeStateText = document.getElementById('eye-state');
 const turnText = document.getElementById('turn-value');
 const directionText = document.getElementById('turn-direction');
+
+const challenge = new HeadTurnChallenge();
+const challengeBtn = document.getElementById('challenge-btn');
+const challengeText = document.getElementById('challenge-text');
+
+challengeBtn.addEventListener('click', () => {
+  challenge.start(performance.now());
+  challengeBtn.disabled = true;
+});
 
 const video = document.getElementById('video');
 const canvas = document.getElementById('overlay');
@@ -58,16 +68,19 @@ function detectLoop() {
     const results = faceLandmarker.detectForVideo(video, now);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let direction = null; // stays null if there is no face this frame
 
     if (results.faceLandmarks.length > 0) {
       const landmarks = results.faceLandmarks[0]; // 478 {x, y, z} points, 0-1 scale
       drawFace(landmarks);
       statusText.textContent = `Face detected (${landmarks.length} points)`;
       updateBlink(landmarks, now);
-      updateTurn(landmarks, now);
+      direction = updateTurn(landmarks, now);
     } else {
       statusText.textContent = 'No face detected. Look at the camera.';
     }
+
+    updateChallenge(direction, now);
   }
 
   requestAnimationFrame(detectLoop);
@@ -98,6 +111,25 @@ function updateTurn(landmarks, now) {
     lastTurnShown = now;
     turnText.textContent = smoothTurn.toFixed(2);
     directionText.textContent = turnDirection(smoothTurn);
+  }
+  return turnDirection(smoothTurn);
+}
+
+// Move the challenge forward and show its state on screen
+function updateChallenge(direction, now) {
+  challenge.update(direction, now);
+  challengeText.className = challenge.state;
+
+  if (challenge.state === 'running') {
+    challengeText.textContent =
+      `Turn your head ${challenge.target}  (${challenge.secondsLeft(now).toFixed(1)} s left)`;
+  } else if (challenge.state === 'passed') {
+    challengeText.textContent =
+      `PASSED: turned ${challenge.target} in ${(challenge.responseMs / 1000).toFixed(2)} s`;
+    challengeBtn.disabled = false;
+  } else if (challenge.state === 'failed') {
+    challengeText.textContent = `FAILED: did not turn ${challenge.target} in time`;
+    challengeBtn.disabled = false;
   }
 }
 

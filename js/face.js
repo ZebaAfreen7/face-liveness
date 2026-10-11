@@ -5,11 +5,13 @@ import {
   DrawingUtils
 } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs';
 import { BlinkDetector } from './blink.js';
+import { headTurnRatio } from './headturn.js';
 
 const blinkDetector = new BlinkDetector();
 const blinkCountText = document.getElementById('blink-count');
 const earText = document.getElementById('ear-value');
 const eyeStateText = document.getElementById('eye-state');
+const turnText = document.getElementById('turn-value');
 
 const video = document.getElementById('video');
 const canvas = document.getElementById('overlay');
@@ -54,6 +56,7 @@ function detectLoop() {
       drawFace(landmarks);
       statusText.textContent = `Face detected (${landmarks.length} points)`;
       updateBlink(landmarks, now);
+      turnText.textContent = headTurnRatio(landmarks).toFixed(2);
     } else {
       statusText.textContent = 'No face detected. Look at the camera.';
     }

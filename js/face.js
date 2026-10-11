@@ -21,6 +21,11 @@ const statusText = document.getElementById('status');
 let faceLandmarker;
 let lastVideoTime = -1;
 
+// Smoothed head-turn value. Each frame keeps 80% of the old value and
+// takes 20% of the new one, so the number stops jumping around.
+let smoothTurn = 0.5;
+const SMOOTHING = 0.8;
+
 // 1. Load the pre-trained model (Google trained it, we just use it)
 async function loadModel() {
   statusText.textContent = 'Loading face model...';
@@ -56,7 +61,7 @@ function detectLoop() {
       drawFace(landmarks);
       statusText.textContent = `Face detected (${landmarks.length} points)`;
       updateBlink(landmarks, now);
-      turnText.textContent = headTurnRatio(landmarks).toFixed(2);
+      updateTurn(landmarks);
     } else {
       statusText.textContent = 'No face detected. Look at the camera.';
     }
@@ -78,6 +83,13 @@ function updateBlink(landmarks, now) {
     blinkCountText.classList.add('blink-flash');
     setTimeout(() => blinkCountText.classList.remove('blink-flash'), 300);
   }
+}
+
+// Work out the head-turn ratio for this frame and show the smoothed value
+function updateTurn(landmarks) {
+  const raw = headTurnRatio(landmarks);
+  smoothTurn = SMOOTHING * smoothTurn + (1 - SMOOTHING) * raw;
+  turnText.textContent = smoothTurn.toFixed(2);
 }
 
 // Draw the face mesh, with the eyes highlighted (we'll use them for blink detection)

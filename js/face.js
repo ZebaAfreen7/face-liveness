@@ -5,13 +5,14 @@ import {
   DrawingUtils
 } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs';
 import { BlinkDetector } from './blink.js';
-import { headTurnRatio } from './headturn.js';
+import { headTurnRatio, turnDirection } from './headturn.js';
 
 const blinkDetector = new BlinkDetector();
 const blinkCountText = document.getElementById('blink-count');
 const earText = document.getElementById('ear-value');
 const eyeStateText = document.getElementById('eye-state');
 const turnText = document.getElementById('turn-value');
+const directionText = document.getElementById('turn-direction');
 
 const video = document.getElementById('video');
 const canvas = document.getElementById('overlay');
@@ -21,10 +22,12 @@ const statusText = document.getElementById('status');
 let faceLandmarker;
 let lastVideoTime = -1;
 
-// Smoothed head-turn value. Each frame keeps 80% of the old value and
-// takes 20% of the new one, so the number stops jumping around.
+// Smoothed head-turn value. Each frame keeps 85% of the old value and
+// takes 15% of the new one, so the number stops jumping around.
 let smoothTurn = 0.5;
-const SMOOTHING = 0.8;
+const SMOOTHING = 0.85;
+let lastTurnShown = 0;      // when we last updated the text on screen
+const SHOW_EVERY_MS = 250;  // update the text 4 times a second (easier to read)
 
 // 1. Load the pre-trained model (Google trained it, we just use it)
 async function loadModel() {
@@ -61,7 +64,7 @@ function detectLoop() {
       drawFace(landmarks);
       statusText.textContent = `Face detected (${landmarks.length} points)`;
       updateBlink(landmarks, now);
-      updateTurn(landmarks);
+      updateTurn(landmarks, now);
     } else {
       statusText.textContent = 'No face detected. Look at the camera.';
     }
@@ -86,10 +89,16 @@ function updateBlink(landmarks, now) {
 }
 
 // Work out the head-turn ratio for this frame and show the smoothed value
-function updateTurn(landmarks) {
-  const raw = headTurnRatio(landmarks);
+function updateTurn(landmarks, now) {
+  let raw = headTurnRatio(landmarks);
+  raw = Math.max(-0.5, Math.min(1.5, raw)); // ignore crazy spikes on big turns
   smoothTurn = SMOOTHING * smoothTurn + (1 - SMOOTHING) * raw;
-  turnText.textContent = smoothTurn.toFixed(2);
+
+  if (now - lastTurnShown > SHOW_EVERY_MS) {
+    lastTurnShown = now;
+    turnText.textContent = smoothTurn.toFixed(2);
+    directionText.textContent = turnDirection(smoothTurn);
+  }
 }
 
 // Draw the face mesh, with the eyes highlighted (we'll use them for blink detection)
